@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
-# Symlink this repo's skills/* into ~/.agents/skills, then into each selected agent's skill folder.
-# Usage: sync.sh [--claude] [--codex] [--dry-run]   (no agent flag = all agents)
+# Symlink this repo's skills/* into ~/.agents/skills (the shared store, also read by Codex),
+# then into ~/.claude/skills. Usage: sync.sh [--dry-run]
 set -euo pipefail
 
-dry_run=0 want_claude=0 want_codex=0
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) dry_run=1 ;;
-    --claude) want_claude=1 ;;
-    --codex) want_codex=1 ;;
-    *) echo "usage: sync.sh [--claude] [--codex] [--dry-run]" >&2; exit 2 ;;
-  esac
-done
-[ "$want_claude$want_codex" = "00" ] && want_claude=1 want_codex=1
+dry_run=0
+case "${1:-}" in
+  "") ;;
+  --dry-run) dry_run=1 ;;
+  *) echo "usage: sync.sh [--dry-run]" >&2; exit 2 ;;
+esac
 
 repo=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../.." && pwd)
 agents_dir="${AGENTS_SKILLS_DIR:-$HOME/.agents/skills}"
-agent_dirs=()
-[ "$want_claude" = 1 ] && agent_dirs+=("${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}")
-[ "$want_codex" = 1 ] && agent_dirs+=("${CODEX_SKILLS_DIR:-${CODEX_HOME:-$HOME/.codex}/skills}")
+claude_dir="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 
 run() { if [ "$dry_run" = 1 ]; then echo "  would: $*"; else "$@"; fi; }
 
@@ -47,22 +41,18 @@ remove_dangling() {
   done
 }
 
-run mkdir -p "$agents_dir" "${agent_dirs[@]}"
-
-# Per agent folder: relative path to the shared store (../../.agents/skills for ~/.claude/skills).
-rels=()
-for d in "${agent_dirs[@]}"; do
-  if [ -d "$d" ]; then rels+=("$(realpath --relative-to="$d" "$agents_dir")"); else rels+=("../../.agents/skills"); fi
-done
+run mkdir -p "$agents_dir" "$claude_dir"
+# Relative path from the claude dir to the store (../../.agents/skills by default).
+if [ -d "$claude_dir" ]; then rel=$(realpath --relative-to="$claude_dir" "$agents_dir"); else rel="../../.agents/skills"; fi
 
 for dir in "$repo"/skills/*/; do
   [ -f "$dir/SKILL.md" ] || continue
   name=$(basename "$dir")
   link "$repo/skills/$name" "$agents_dir/$name" || continue
-  for i in "${!agent_dirs[@]}"; do link "${rels[$i]}/$name" "${agent_dirs[$i]}/$name" || true; done
+  link "$rel/$name" "$claude_dir/$name" || true
 done
 
 remove_dangling "$agents_dir" "$repo/skills"
-for i in "${!agent_dirs[@]}"; do remove_dangling "${agent_dirs[$i]}" "${rels[$i]}"; done
+remove_dangling "$claude_dir" "$rel"
 
 [ "$dry_run" = 1 ] && echo "done (dry run)" || echo "done"
