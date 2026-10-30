@@ -5,22 +5,23 @@ description: Sync the personal skills in this repo (`skills/*`) into the local a
 
 # Sync skills
 
-Links every skill in this repo's `skills/` folder into the local agent skill folders, using
-the layout the `skills` CLI already uses:
+Links every skill in this repo's `skills/` folder into the local agent skill folders:
 
-- `~/.agents/skills/<name>` -> `<repo>/skills/<name>`
-- `~/.claude/skills/<name>` -> `../../.agents/skills/<name>`
+- `~/.agents/skills/<name>` -> `<repo>/skills/<name>` (the shared store, always written)
+- `~/.claude/skills/<name>` -> `../../.agents/skills/<name>` (`--claude`)
+- `~/.codex/skills/<name>` -> `../../.agents/skills/<name>` (`--codex`, honors `$CODEX_HOME`)
 
 Because these are symlinks, editing a skill in the repo takes effect immediately; re-running
 the sync is only needed when a skill is added or removed.
 
 ## Run
 
-Preview first, then apply:
+Pick the agent with `--claude` and/or `--codex`; with neither flag, both are synced. Preview
+first with `--dry-run`, then apply:
 
 ```bash
-bash scripts/sync.sh --dry-run
-bash scripts/sync.sh
+bash scripts/sync.sh --claude --dry-run
+bash scripts/sync.sh --claude
 ```
 
 Run the script from this skill's directory (or pass its full path). It finds the repo from its
