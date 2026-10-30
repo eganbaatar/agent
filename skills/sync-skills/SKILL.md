@@ -25,16 +25,28 @@ bash scripts/sync.sh
 Run the script from this skill's directory (or pass its full path). It finds the repo from its
 own location, so it works from any checkout.
 
+## Never overwrite without asking
+
+The script never replaces anything on its own. If a skill name is already taken in
+`~/.agents/skills` or `~/.claude/skills` (a real folder, or a link to somewhere else, for
+example a skill installed with `npx skills`), it prints a `conflict` line, skips that skill and
+exits with code 3.
+
+When that happens:
+
+1. Show the user each `conflict` line and what the existing entry is.
+2. Ask for permission to replace it, naming the skills. Do not assume a yes covers other skills.
+3. Only after a clear yes, re-run with `--overwrite=<name>` for each approved skill, for
+   example `bash scripts/sync.sh --overwrite=grill-me`. The old entry is moved to
+   `~/.agents/skills-backup/<timestamp>/`, not deleted, so it can be restored.
+
 ## Behavior
 
 - Idempotent: links that already point at the right place are left alone.
-- Never overwrites a real file or folder, or a link that points somewhere else (for example a
-  skill installed by `npx skills`). It prints a warning and skips that skill. Resolve the
-  conflict by hand, then re-run.
 - Removes dangling links that pointed into this repo, so deleting a skill here and syncing
   cleans up the local folders.
 - Does not touch `~/.agents/.skill-lock.json` or any skill it did not link.
 - A skill is any `skills/<name>/` folder that contains a `SKILL.md`.
 
-After syncing, tell the user which skills were linked, skipped, or removed. A new skill shows
+After syncing, tell the user which skills were linked, skipped, or replaced. A new skill shows
 up in Claude Code at the start of the next session.

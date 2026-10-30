@@ -1,31 +1,46 @@
 #!/usr/bin/env bash
 # Symlink this repo's skills/* into ~/.agents/skills (the shared store, also read by Codex),
-# then into ~/.claude/skills. Usage: sync.sh [--dry-run]
+# then into ~/.claude/skills.
+# Usage: sync.sh [--dry-run] [--overwrite=<name>]...
+# Anything already in the way is reported as a conflict and left alone (exit 3) unless it is
+# named with --overwrite, in which case it is moved to ~/.agents/skills-backup first.
 set -euo pipefail
 
 dry_run=0
-case "${1:-}" in
-  "") ;;
-  --dry-run) dry_run=1 ;;
-  *) echo "usage: sync.sh [--dry-run]" >&2; exit 2 ;;
-esac
+overwrite=" "
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=1 ;;
+    --overwrite=?*) overwrite+="${arg#--overwrite=} " ;;
+    *) echo "usage: sync.sh [--dry-run] [--overwrite=<name>]..." >&2; exit 2 ;;
+  esac
+done
 
 repo=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../.." && pwd)
 agents_dir="${AGENTS_SKILLS_DIR:-$HOME/.agents/skills}"
 claude_dir="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
+backup_dir="${SKILLS_BACKUP_DIR:-$HOME/.agents/skills-backup}/$(date +%Y%m%d-%H%M%S)"
+conflicts=0
 
 run() { if [ "$dry_run" = 1 ]; then echo "  would: $*"; else "$@"; fi; }
 
-# link <target> <link>: create a symlink, never clobber anything else.
+# link <name> <target> <link>: create a symlink. An existing, different entry is a conflict:
+# reported and skipped, unless <name> was passed to --overwrite (then backed up and replaced).
 link() {
-  local target=$1 path=$2
-  if [ -L "$path" ]; then
-    [ "$(readlink "$path")" = "$target" ] && return 0
-    echo "skip   $path -> $(readlink "$path") (points elsewhere)"
-    return 1
-  elif [ -e "$path" ]; then
-    echo "skip   $path (exists and is not a symlink)"
-    return 1
+  local name=$1 target=$2 path=$3
+  if [ -L "$path" ] && [ "$(readlink "$path")" = "$target" ]; then return 0; fi
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    local what="a real folder or file"
+    [ -L "$path" ] && what="a link to $(readlink "$path")"
+    if [[ "$overwrite" != *" $name "* ]]; then
+      echo "conflict $path is $what"
+      conflicts=1
+      return 1
+    fi
+    echo "backup $path -> $backup_dir/"
+    run mkdir -p "$backup_dir"
+    local owner; owner=$(basename "$(dirname "$(dirname "$path")")")
+    run mv "$path" "$backup_dir/${owner#.}-$name"
   fi
   if [ "$dry_run" = 1 ]; then echo "would link $path -> $target"; else ln -s "$target" "$path"; echo "link   $path -> $target"; fi
 }
@@ -48,11 +63,15 @@ if [ -d "$claude_dir" ]; then rel=$(realpath --relative-to="$claude_dir" "$agent
 for dir in "$repo"/skills/*/; do
   [ -f "$dir/SKILL.md" ] || continue
   name=$(basename "$dir")
-  link "$repo/skills/$name" "$agents_dir/$name" || continue
-  link "$rel/$name" "$claude_dir/$name" || true
+  link "$name" "$repo/skills/$name" "$agents_dir/$name" || continue
+  link "$name" "$rel/$name" "$claude_dir/$name" || true
 done
 
 remove_dangling "$agents_dir" "$repo/skills"
 remove_dangling "$claude_dir" "$rel"
 
 [ "$dry_run" = 1 ] && echo "done (dry run)" || echo "done"
+if [ "$conflicts" = 1 ]; then
+  echo "conflicts found: nothing was overwritten. Re-run with --overwrite=<name> after the user approves." >&2
+  exit 3
+fi
