@@ -58,10 +58,6 @@ system can now do, and why.
 
 What changed. Put the most important changes first and mark breaking changes
 clearly, e.g. **Breaking:** `GET /items` now requires pagination params.
-
-## Tests
-
-What test coverage was added or updated, and anything not covered.
 ```
 
 ## Other types (`refactor:`, `chore:`, `docs:`, `ci:`)
