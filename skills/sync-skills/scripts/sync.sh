@@ -16,7 +16,20 @@ for arg in "$@"; do
   esac
 done
 
-repo=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../.." && pwd)
+repo="${XDG_DATA_HOME:-$HOME/.local/share}/sync-skills/agent"
+url=https://github.com/eganbaatar/agent.git
+if [ ! -e "$repo" ] && [ ! -L "$repo" ]; then
+  mkdir -p "$(dirname "$repo")"
+  git clone --branch main --single-branch "$url" "$repo"
+elif [ -L "$repo" ] || [ ! -d "$repo/.git" ] ||
+     [ "$(git -C "$repo" config --get remote.origin.url)" != "$url" ] ||
+     [ "$(git -C "$repo" symbolic-ref --short HEAD)" != main ]; then
+  echo "Unexpected checkout at $repo; leaving it alone" >&2
+  exit 1
+else
+  git -C "$repo" pull --ff-only origin main
+fi
+
 agents_dir="${AGENTS_SKILLS_DIR:-$HOME/.agents/skills}"
 claude_dir="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 backup_dir="${SKILLS_BACKUP_DIR:-$HOME/.agents/skills-backup}/$(date +%Y%m%d-%H%M%S)"

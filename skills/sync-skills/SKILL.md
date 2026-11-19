@@ -1,6 +1,6 @@
 ---
 name: sync-skills
-description: Sync the personal skills in this repo (`skills/*`) into the local agent skill folders by symlink, so edits in the repo are live. Use when the user says "sync my skills", "install my skills", "link my skills", after adding or removing a skill in this repo, or on a new machine.
+description: Sync personal skills from a managed checkout of eganbaatar/agent into local agent skill folders by symlink. Use when the user says "sync my skills", "install my skills", "link my skills", after adding or removing a skill in this repo, or on a new machine.
 ---
 
 # Sync skills
@@ -10,20 +10,27 @@ Syncs every skill in this repo's `skills/` folder into the local skill folders:
 - `~/.agents/skills/<name>` -> `<repo>/skills/<name>` (the shared store; Codex reads it too)
 - `~/.claude/skills/<name>` -> `../../.agents/skills/<name>`
 
-Because these are symlinks, editing a skill in the repo takes effect immediately; re-running
-the sync is only needed when a skill is added or removed.
+Keep the managed checkout in the user's data directory, not `/tmp`: installed symlinks
+(including `/sync-skills` itself) need their targets to survive restarts and cache cleanup.
 
 ## Run
 
-Preview first, then apply:
+From this skill's directory, preview link changes:
 
 ```bash
 bash scripts/sync.sh --dry-run
+```
+
+Every invocation (including dry runs) clones `main` into
+`${XDG_DATA_HOME:-$HOME/.local/share}/sync-skills/agent` or refreshes it with
+`git pull --ff-only`. If preparation fails, report the error and stop.
+After reviewing the preview, apply:
+
+```bash
 bash scripts/sync.sh
 ```
 
-Run the script from this skill's directory (or pass its full path). It finds the repo from its
-own location, so it works from any checkout.
+Existing links into a developer checkout are conflicts, not permission to migrate them silently.
 
 ## Never overwrite without asking
 
